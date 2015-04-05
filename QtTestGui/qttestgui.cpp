@@ -1,5 +1,6 @@
 #include "qttestgui.h"
 #include "Helpers/ImageUtils.h"
+#include "Helpers/bit_view.h"
 
 QtTestGui::QtTestGui(QWidget *parent)
 	: QMainWindow(parent), trayIcon(this), stopD3d(false){
@@ -16,6 +17,12 @@ QtTestGui::QtTestGui(QWidget *parent)
 
 	HRESULT hr = S_OK;
 	D3D_FEATURE_LEVEL levels[] = {
+		D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_11_1,
+		D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_11_0,
+		D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_10_1,
+		D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_10_0,
+		D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_3,
+		D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_2,
 		D3D_FEATURE_LEVEL::D3D_FEATURE_LEVEL_9_1
 	};
 
@@ -207,10 +214,13 @@ void QtTestGui::RenderD3d(){
 			/*scale -= 0.005f;
 
 			if (scale < 0.2f){
-			scale = 2.0f;
+				scale = 2.0f;
 			}*/
 
-			transform = DirectX::XMMatrixMultiply(transform, DirectX::XMMatrixScaling(scale, scale, 1.0f));
+			/*transform = DirectX::XMMatrixMultiply(transform, DirectX::XMMatrixScaling(scale, scale, 1.0f));
+			transform = DirectX::XMMatrixMultiply(transform, DirectX::XMMatrixTranslation(0.0f, 0.0f, 1.0f));*/
+
+			transform = DirectX::XMMatrixMultiply(transform, DirectX::XMMatrixScaling(1024, 1024, 1.0f));
 			transform = DirectX::XMMatrixMultiply(transform, DirectX::XMMatrixTranslation(0.0f, 0.0f, 1.0f));
 
 			DirectX::XMMATRIX proj = DirectX::XMLoadFloat4x4(&this->projection);
@@ -232,7 +242,10 @@ void QtTestGui::RenderD3d(){
 			this->d3dCtx->VSSetConstantBuffers(0, 1, this->cbuffer.GetAddressOf());
 			this->d3dCtx->VSSetShader(this->vshader.Get(), nullptr, 0);
 
-			this->d3dCtx->PSSetShaderResources(0, 1, this->mipMapSrv.GetAddressOf());
+			this->d3dCtx->PSSetShaderResources(0, 1, this->mipMapSrv0.GetAddressOf());
+			this->d3dCtx->PSSetShaderResources(1, 1, this->mipMapSrv1.GetAddressOf());
+			this->d3dCtx->PSSetShaderResources(2, 1, this->mipMapSrv2.GetAddressOf());
+			this->d3dCtx->PSSetShaderResources(3, 1, this->mipMapSrv3.GetAddressOf());
 			this->d3dCtx->PSSetSamplers(0, 1, this->sampler.GetAddressOf());
 			this->d3dCtx->PSSetShader(this->pshader.Get(), nullptr, 0);
 
@@ -243,11 +256,9 @@ void QtTestGui::RenderD3d(){
 	}
 }
 
-void QtTestGui::TestTextureTypes(){
-	HRESULT hr = S_OK;
-
+std::vector<uint8_t> QtTestGui::LoadTexture(const std::wstring &path){
 	ImageUtils imgUtils;
-	auto decoder = imgUtils.CreateDecoder(L"testMipMap.png");
+	auto decoder = imgUtils.CreateDecoder(path.c_str());
 	auto frame = imgUtils.CreateFrameForDecode(decoder.Get());
 	auto frameSize = imgUtils.GetFrameSize(frame.Get());
 
@@ -255,23 +266,43 @@ void QtTestGui::TestTextureTypes(){
 
 	imgUtils.DecodePixels(frame.Get(), pixels.size(), pixels.data());
 
+	/*bit_view<big_endian_block_order> pixelBits;
+	pixelBits.set_data(pixels.data(), frameSize.x * frameSize.y);
+
+	bool p0 = pixelBits[138 + 19 * frameSize.x];
+	bool p1 = pixelBits[137 + 19 * frameSize.x];
+	bool p2 = pixelBits[137 + 20 * frameSize.x];*/
+
+	return pixels;
+}
+
+void QtTestGui::TestTextureTypes(){
+	HRESULT hr = S_OK;
+
+	ImageUtils imgUtils;
+	auto decoder = imgUtils.CreateDecoder(L"mipSrc2.png");
+	auto frame = imgUtils.CreateFrameForDecode(decoder.Get());
+	auto frameSize = imgUtils.GetFrameSize(frame.Get());
+
+	/*std::vector<uint8_t> pixels(imgUtils.GetFrameByteSize(frame.Get()));
+
+	imgUtils.DecodePixels(frame.Get(), pixels.size(), pixels.data());*/
+
 	Microsoft::WRL::ComPtr<ID3D11Texture2D> tex;
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
 	D3D11_TEXTURE2D_DESC texDesc;
 
-	texDesc.Width = frameSize.x;
+	texDesc.Width = frameSize.x / 8;// frameSize.x;
 	texDesc.Height = frameSize.y;
-	texDesc.MipLevels = 8;
+	texDesc.MipLevels = 1;// 8;
 	texDesc.ArraySize = 1;
-	texDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM;
+	texDesc.Format = DXGI_FORMAT::DXGI_FORMAT_R8_UNORM;// DXGI_FORMAT::DXGI_FORMAT_R8G8B8A8_UNORM;
 	texDesc.SampleDesc.Count = 1;
 	texDesc.SampleDesc.Quality = 0;
 	texDesc.Usage = D3D11_USAGE::D3D11_USAGE_DEFAULT;
-	texDesc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_FLAG::D3D11_BIND_RENDER_TARGET;
+	texDesc.BindFlags = D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE;// | D3D11_BIND_FLAG::D3D11_BIND_RENDER_TARGET;
 	texDesc.CPUAccessFlags = 0;
-	texDesc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-
-	hr = this->d3dDev->CreateTexture2D(&texDesc, nullptr, tex.GetAddressOf());
+	texDesc.MiscFlags = 0;// D3D11_RESOURCE_MISC_GENERATE_MIPS;
 
 	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
 
@@ -280,20 +311,42 @@ void QtTestGui::TestTextureTypes(){
 	srvDesc.Texture2D.MostDetailedMip = 0;
 	srvDesc.Texture2D.MipLevels = texDesc.MipLevels;
 
-	hr = this->d3dDev->CreateShaderResourceView(tex.Get(), &srvDesc, srv.GetAddressOf());
-
 	D3D11_BOX box;
 	box.left = box.top = 0;
 	box.right = frameSize.x;
 	box.bottom = frameSize.y;
 	box.front = 0;
 	box.back = 1;
-	this->d3dCtx->UpdateSubresource(tex.Get(), 0, &box, pixels.data(), frameSize.y * 4, frameSize.x * frameSize.y * 4);
-	if (texDesc.MipLevels > 1){
-		this->d3dCtx->GenerateMips(srv.Get());
-	}
 
-	this->mipMapSrv = srv;
+	/*this->d3dCtx->UpdateSubresource(tex.Get(), 0, &box, pixels.data(), frameSize.x * 4, frameSize.x * frameSize.y * 4);*/
+	/*if (texDesc.MipLevels > 1){
+		this->d3dCtx->GenerateMips(srv.Get());
+		}*/
+
+	auto pixels0 = this->LoadTexture(L"Gray_mipSrc0.png");
+	auto pixels1 = this->LoadTexture(L"Gray_mipSrc1.png");
+	auto pixels2 = this->LoadTexture(L"Gray_mipSrc2.png");
+	auto pixels3 = this->LoadTexture(L"Gray_mipSrc3.png");
+
+	hr = this->d3dDev->CreateTexture2D(&texDesc, nullptr, tex.ReleaseAndGetAddressOf());
+	hr = this->d3dDev->CreateShaderResourceView(tex.Get(), &srvDesc, srv.ReleaseAndGetAddressOf());
+	this->d3dCtx->UpdateSubresource(tex.Get(), 0, &box, pixels0.data(), frameSize.x  / 8, (frameSize.x * frameSize.y) / 8);
+	this->mipMapSrv0 = srv;
+
+	hr = this->d3dDev->CreateTexture2D(&texDesc, nullptr, tex.ReleaseAndGetAddressOf());
+	hr = this->d3dDev->CreateShaderResourceView(tex.Get(), &srvDesc, srv.ReleaseAndGetAddressOf());
+	this->d3dCtx->UpdateSubresource(tex.Get(), 0, &box, pixels1.data(), frameSize.x / 8, (frameSize.x * frameSize.y) / 8);
+	this->mipMapSrv1 = srv;
+
+	hr = this->d3dDev->CreateTexture2D(&texDesc, nullptr, tex.ReleaseAndGetAddressOf());
+	hr = this->d3dDev->CreateShaderResourceView(tex.Get(), &srvDesc, srv.ReleaseAndGetAddressOf());
+	this->d3dCtx->UpdateSubresource(tex.Get(), 0, &box, pixels2.data(), frameSize.x / 8, (frameSize.x * frameSize.y) / 8);
+	this->mipMapSrv2 = srv;
+
+	hr = this->d3dDev->CreateTexture2D(&texDesc, nullptr, tex.ReleaseAndGetAddressOf());
+	hr = this->d3dDev->CreateShaderResourceView(tex.Get(), &srvDesc, srv.ReleaseAndGetAddressOf());
+	this->d3dCtx->UpdateSubresource(tex.Get(), 0, &box, pixels3.data(), frameSize.x / 8, (frameSize.x * frameSize.y) / 8);
+	this->mipMapSrv3 = srv;
 }
 
 void QtTestGui::CreateGeometry(){
@@ -327,7 +380,8 @@ void QtTestGui::CreateGeometry(){
 
 void QtTestGui::CreateShaders(){
 	auto vshaderData = H::System::LoadPackageFile(L"VertexShader.cso");
-	auto pshaderData = H::System::LoadPackageFile(L"PixelShader.cso");
+	/*auto pshaderData = H::System::LoadPackageFile(L"PixelShader.cso");*/
+	auto pshaderData = H::System::LoadPackageFile(L"BitSamplingPixelShader.cso");
 
 	this->d3dDev->CreateVertexShader(vshaderData.data(), vshaderData.size(), nullptr, this->vshader.GetAddressOf());
 	this->d3dDev->CreatePixelShader(pshaderData.data(), pshaderData.size(), nullptr, this->pshader.GetAddressOf());
@@ -342,7 +396,8 @@ void QtTestGui::CreateShaders(){
 void QtTestGui::CreateSampler(){
 	D3D11_SAMPLER_DESC samplerDesc;
 
-	samplerDesc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	/*samplerDesc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_LINEAR;*/
+	samplerDesc.Filter = D3D11_FILTER::D3D11_FILTER_MIN_MAG_MIP_POINT;
 	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
 	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
 	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -363,6 +418,7 @@ void QtTestGui::UpdateProjection(){
 		ar = static_cast<float>(this->width()) / static_cast<float>(this->height());
 	}
 
-	auto projTmp = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(90.0f), ar, 0.1f, 10.0f);
+	//auto projTmp = DirectX::XMMatrixPerspectiveFovLH(DirectX::XMConvertToRadians(90.0f), ar, 0.1f, 10.0f);
+	auto projTmp = DirectX::XMMatrixOrthographicOffCenterLH(-(this->width() / 2), (this->width() / 2), -(this->height() / 2), (this->height() / 2), 0.1f, 10.0f);
 	DirectX::XMStoreFloat4x4(&this->projection, projTmp);
 }

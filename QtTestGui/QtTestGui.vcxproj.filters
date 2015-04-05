@@ -193,8 +193,16 @@
   <ItemGroup>
     <FxCompile Include="VertexShader.hlsl" />
     <FxCompile Include="PixelShader.hlsl" />
+    <FxCompile Include="BitSamplingPixelShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="testMipMap.png" />
+    <Image Include="Gray_mipSrc0.png" />
+    <Image Include="Gray_mipSrc1.png" />
+    <Image Include="Gray_mipSrc2.png" />
+    <Image Include="Gray_mipSrc3.png" />
+    <Image Include="mipSrc0.png" />
+    <Image Include="mipSrc1.png" />
+    <Image Include="mipSrc2.png" />
+    <Image Include="mipSrc3.png" />
   </ItemGroup>
 </Project>

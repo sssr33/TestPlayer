@@ -41,7 +41,10 @@ private:
 	Microsoft::WRL::ComPtr<IDXGISwapChain2> d3dSwapChain;
 	Microsoft::WRL::ComPtr<ID3D11RenderTargetView> d3dRtView;
 
-	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> mipMapSrv;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> mipMapSrv0;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> mipMapSrv1;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> mipMapSrv2;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> mipMapSrv3;
 
 	Microsoft::WRL::ComPtr<ID3D11Buffer> positions;
 	Microsoft::WRL::ComPtr<ID3D11Buffer> cbuffer;
@@ -53,6 +56,7 @@ private:
 	DirectX::XMFLOAT4X4 projection;
 
 	void RenderD3d();
+	std::vector<uint8_t> LoadTexture(const std::wstring &path);
 	void TestTextureTypes();
 	void CreateGeometry();
 	void CreateShaders();
