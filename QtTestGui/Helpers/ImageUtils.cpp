@@ -103,7 +103,7 @@ uint32_t ImageUtils::GetFrameByteSize(IWICBitmapSource *frame) const{
 	auto frameSize = ImageUtils::GetFrameSize(frame);
 	auto pixelBitSize = this->GetPixelBitSize(frame);
 
-	byteSize = (frameSize.x * frameSize.y) * (pixelBitSize / 8);
+	byteSize = (frameSize.x * frameSize.y * pixelBitSize) / 8;
 
 	return byteSize;
 }
@@ -206,7 +206,7 @@ Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> ImageUtils::CreateFrameForDecode(I
 void ImageUtils::DecodePixels(IWICBitmapSource *frame, uint32_t pixelsByteSize, void *pixels, const WICRect *rect) const{
 	HRESULT hr = S_OK;
 	auto frameStride = this->GetFrameStride(frame);
-
+	
 	hr = frame->CopyPixels(rect, frameStride, pixelsByteSize, static_cast<BYTE *>(pixels));
 	H::System::ThrowIfFailed(hr);
 }
